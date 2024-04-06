@@ -1,6 +1,6 @@
 import streamlit as st
 import tempfile
-from paddleocr import PPStructure, draw_structure_result, save_structure_res
+from paddleocr import PPStructure, draw_structure_result, save_structure_res # type: ignore
 from langchain_community.llms.moonshot import Moonshot
 import os
 import shutil
@@ -141,8 +141,8 @@ if uploaded_file is not None:
     with st.container(border=True):
         with st.spinner('正在识别...'):
             html, image = recognize_table(uploaded_file)
-            # json_data = html2json(html, main_fields, child_fields)
-            json_data = {}
+            json_data = html2json(html, main_fields, child_fields)
+            # json_data = {}
             # main, children = extract_field_names(json_data)
             # hecom_main = convert_origin_to_hecom(main, main_fields)
             # hecom_children = convert_origin_to_hecom(children, child_fields)
