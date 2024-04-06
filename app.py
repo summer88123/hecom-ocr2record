@@ -1,8 +1,10 @@
 import streamlit as st
 import tempfile
-from paddleocr import PPStructure
+from paddleocr import PPStructure, draw_structure_result, save_structure_res
 from langchain_community.llms.moonshot import Moonshot
 import os
+import shutil
+from datetime import datetime
 from langchain.prompts import PromptTemplate
 from langchain.schema import StrOutputParser
 from langchain_core.output_parsers import JsonOutputParser
@@ -21,7 +23,7 @@ def get_ocr_llm():
         raise ValueError("MOONSHOT_API_KEY not found in environment variables")
 
     # 初始化PaddleOCR
-    return PPStructure(layout=False, show_log=True), Moonshot(model="moonshot-v1-8k") # type: ignore
+    return PPStructure(image_orientation=True, show_log=True), Moonshot(model="moonshot-v1-8k") # type: ignore
 
 
 ocr, llm = get_ocr_llm()
@@ -72,13 +74,34 @@ def convert_origin_to_hecom(origin, hecom):
     return runnable.invoke({"origin":",".join(origin), "hecom":",".join(hecom)})
 
 def recognize_table(uploaded_file):
-    tfile = tempfile.NamedTemporaryFile(delete=False) 
-    tfile.write(uploaded_file.read())
+    save_folder = './output'
+    # 创建以当前时间命名的子文件夹
+    current_time = datetime.now().strftime("%Y%m%d%H%M%S")
+    sub_folder = os.path.join(save_folder, current_time)
+    os.makedirs(sub_folder, exist_ok=True)
+
+    # tfile = tempfile.NamedTemporaryFile(delete=False) 
+    # tfile.write(uploaded_file.read())
+    # 将上传的文件复制到新的目录
+    uploaded_file_path = os.path.join(sub_folder, uploaded_file.name)
+    with open(uploaded_file_path, 'wb') as f:
+        shutil.copyfileobj(uploaded_file, f)
+
+
     # 读取图片
-    img = cv2.imread(tfile.name) # type: ignore
+    img = cv2.imread(uploaded_file_path) # type: ignore
     # 使用PaddleOCR进行表格识别
     result = ocr(img)
-    return result[0]['res']['html']
+    save_structure_res(result, sub_folder, 'result')
+
+    from PIL import Image
+
+    image = Image.open(uploaded_file_path).convert('RGB')
+    im_show = draw_structure_result(image, result, font_path='./chinese_cht.ttf')
+    im_show = Image.fromarray(im_show)
+    result_image_path = os.path.join(sub_folder, 'result.jpg')
+    im_show.save(result_image_path)
+    return result[0]['res']['html'], result_image_path
 
 def extract_field_names(json_data):
     main_fields = list(json_data['main'].keys())
@@ -117,8 +140,9 @@ st.info("支持的图片格式：jpg, jpeg, png")
 if uploaded_file is not None:
     with st.container(border=True):
         with st.spinner('正在识别...'):
-            html = recognize_table(uploaded_file)
-            json_data = html2json(html, main_fields, child_fields)
+            html, image = recognize_table(uploaded_file)
+            # json_data = html2json(html, main_fields, child_fields)
+            json_data = {}
             # main, children = extract_field_names(json_data)
             # hecom_main = convert_origin_to_hecom(main, main_fields)
             # hecom_children = convert_origin_to_hecom(children, child_fields)
@@ -129,6 +153,7 @@ if uploaded_file is not None:
 
         st.write("OCR识别结果：")
         st.markdown(html, unsafe_allow_html=True)
+        st.image(image, caption='识别结果', use_column_width=True)
         st.write("JSON结果：")
         st.code(json.dumps(json_data,indent=2, ensure_ascii=False), language='json')
         
