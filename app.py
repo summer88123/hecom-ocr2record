@@ -23,7 +23,7 @@ def get_ocr_llm():
         raise ValueError("MOONSHOT_API_KEY not found in environment variables")
 
     # 初始化PaddleOCR
-    return PPStructure(image_orientation=True, show_log=True), Moonshot(model="moonshot-v1-8k") # type: ignore
+    return PPStructure(image_orientation=True,layout=False, show_log=True), Moonshot(model="moonshot-v1-8k") # type: ignore
 
 
 ocr, llm = get_ocr_llm()
@@ -141,7 +141,7 @@ if uploaded_file is not None:
     with st.container(border=True):
         with st.spinner('正在识别...'):
             html, image = recognize_table(uploaded_file)
-            json_data = html2json(html, main_fields, child_fields)
+            #json_data = html2json(html, main_fields, child_fields)
             # json_data = {}
             # main, children = extract_field_names(json_data)
             # hecom_main = convert_origin_to_hecom(main, main_fields)
@@ -154,6 +154,8 @@ if uploaded_file is not None:
         st.write("OCR识别结果：")
         st.markdown(html, unsafe_allow_html=True)
         st.image(image, caption='识别结果', use_column_width=True)
+        with st.spinner("大模型正在处理JSON..."):
+            json_data = html2json(html, main_fields, child_fields)
         st.write("JSON结果：")
         st.code(json.dumps(json_data,indent=2, ensure_ascii=False), language='json')
         
